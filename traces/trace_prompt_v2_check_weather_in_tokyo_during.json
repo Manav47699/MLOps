@@ -1,0 +1,50 @@
+{
+  "query": "Check weather in Tokyo during an upstream service outage.",
+  "prompt_version": "prompt_v2",
+  "prompt_description": "Decomposes multi-entity queries into sequential tool calls, but lacks outage guardrails",
+  "system_prompt": "You are a tool-aware AI assistant. When a query involves multiple entities (such as comparing two cities), systematically query tools for EACH entity before answering. Summarize findings accurately.",
+  "total_iterations": 3,
+  "completed": false,
+  "termination_reason": "max_iterations_hit",
+  "execution_time_seconds": 0.0003,
+  "total_tokens": 306,
+  "steps": [
+    {
+      "step": 1,
+      "tool": "get_weather",
+      "args": {
+        "location": "Tokyo",
+        "simulate_failure": true
+      },
+      "result": "{\"status\": \"error\", \"code\": 503, \"message\": \"Simulated Tool Failure: Weather service unreachable for 'Tokyo' (503 Service Unavailable).\"}",
+      "reasoning": "Verification Failed: Lacks graceful degradation and explicit zero-hallucination guarantee.",
+      "intermediate_decision": "Encountered 503 error; retry iteration 1 without explicit outage notice.",
+      "draft": "The weather lookup for Tokyo encountered an unexpected server error (503)."
+    },
+    {
+      "step": 2,
+      "tool": "get_weather",
+      "args": {
+        "location": "Tokyo",
+        "simulate_failure": true
+      },
+      "result": "{\"status\": \"error\", \"code\": 503, \"message\": \"Simulated Tool Failure: Weather service unreachable for 'Tokyo' (503 Service Unavailable).\"}",
+      "reasoning": "Verification Failed: Lacks graceful degradation and explicit zero-hallucination guarantee.",
+      "intermediate_decision": "Encountered 503 error; retry iteration 2 without explicit outage notice.",
+      "draft": "The weather lookup for Tokyo encountered an unexpected server error (503)."
+    },
+    {
+      "step": 3,
+      "tool": "get_weather",
+      "args": {
+        "location": "Tokyo",
+        "simulate_failure": true
+      },
+      "result": "{\"status\": \"error\", \"code\": 503, \"message\": \"Simulated Tool Failure: Weather service unreachable for 'Tokyo' (503 Service Unavailable).\"}",
+      "reasoning": "Verification Failed: Lacks graceful degradation and explicit zero-hallucination guarantee.",
+      "intermediate_decision": "Encountered 503 error; retry iteration 3 without explicit outage notice.",
+      "draft": "The weather lookup for Tokyo encountered an unexpected server error (503)."
+    }
+  ],
+  "final_answer": "The weather lookup for Tokyo encountered an unexpected server error (503).\n\n[Loop Notice: Maximum iteration limit reached. Best verified draft returned.]"
+}

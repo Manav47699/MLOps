@@ -105,14 +105,21 @@ with tab_agent:
 
     agent_query = st.text_area("User Goal / Query", value=default_query, height=70)
 
-    col_a, col_b = st.columns([1, 1])
+    col_a, col_b, col_c = st.columns([1, 1, 1])
     with col_a:
-        simulate_failure_toggle = st.checkbox(
-            "Simulate Tool Failure (Failure Injection Test)",
-            value=default_failure,
-            help="Simulates a 503 Service Unavailable error to verify that the agent degrades gracefully without hallucinating fake data."
+        prompt_version_choice = st.selectbox(
+            "Prompt Version (Track B)",
+            ["prompt_v3", "prompt_v2", "prompt_v1"],
+            index=0,
+            help="Compare different prompt versions tracked in MLflow."
         )
     with col_b:
+        simulate_failure_toggle = st.checkbox(
+            "Simulate Tool Failure",
+            value=default_failure,
+            help="Simulates a 503 error to verify graceful degradation."
+        )
+    with col_c:
         max_iters_input = st.slider("Max Loop Iterations Guard", min_value=1, max_value=3, value=3)
 
     if st.button("Run Agentic Loop", type="primary", key="btn_agent_run"):
@@ -121,6 +128,7 @@ with tab_agent:
         else:
             payload = {
                 "query": agent_query.strip(),
+                "prompt_version": prompt_version_choice,
                 "simulate_failure": simulate_failure_toggle,
                 "temperature": temperature,
                 "top_p": top_p,

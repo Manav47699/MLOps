@@ -1,0 +1,36 @@
+{
+  "query": "Compare current weather in Paris and Kathmandu and recommend where to walk.",
+  "prompt_version": "prompt_v2",
+  "prompt_description": "Decomposes multi-entity queries into sequential tool calls, but lacks outage guardrails",
+  "system_prompt": "You are a tool-aware AI assistant. When a query involves multiple entities (such as comparing two cities), systematically query tools for EACH entity before answering. Summarize findings accurately.",
+  "total_iterations": 2,
+  "completed": true,
+  "termination_reason": "success",
+  "execution_time_seconds": 0.0002,
+  "total_tokens": 203,
+  "steps": [
+    {
+      "step": 1,
+      "tool": "get_weather",
+      "args": {
+        "location": "Paris"
+      },
+      "result": "{\"status\": \"ok\", \"location\": \"Paris\", \"temperature\": \"22C\", \"condition\": \"Cloudy\"}",
+      "reasoning": "Verification Pending: Only Paris retrieved; awaiting Kathmandu.",
+      "intermediate_decision": "Retrieved Paris; continuing to retrieve second entity Kathmandu.",
+      "draft": "In Paris, the weather is 22C and Cloudy. Still need Kathmandu weather."
+    },
+    {
+      "step": 2,
+      "tool": "get_weather",
+      "args": {
+        "location": "Kathmandu"
+      },
+      "result": "{\"status\": \"ok\", \"location\": \"Kathmandu\", \"temperature\": \"24C\", \"condition\": \"Pleasant\"}",
+      "reasoning": "Verification Passed: Both Paris and Kathmandu verified against tool results.",
+      "intermediate_decision": "Retrieved Kathmandu; both entities ready for grounded comparative analysis.",
+      "draft": "In Paris, the weather is 22C and Cloudy. In Kathmandu, the weather is 24C and Pleasant. For walking, Kathmandu offers warmer and clearer conditions."
+    }
+  ],
+  "final_answer": "In Paris, the weather is 22C and Cloudy. In Kathmandu, the weather is 24C and Pleasant. For walking, Kathmandu offers warmer and clearer conditions."
+}

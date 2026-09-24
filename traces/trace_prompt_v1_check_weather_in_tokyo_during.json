@@ -1,0 +1,26 @@
+{
+  "query": "Check weather in Tokyo during an upstream service outage.",
+  "prompt_version": "prompt_v1",
+  "prompt_description": "Baseline naive prompt without entity decomposition or outage handling",
+  "system_prompt": "You are a basic AI assistant. Answer user queries. Use tools if available. Stop after the first answer.",
+  "total_iterations": 1,
+  "completed": false,
+  "termination_reason": "max_iterations_hit",
+  "execution_time_seconds": 0.0002,
+  "total_tokens": 95,
+  "steps": [
+    {
+      "step": 1,
+      "tool": "get_weather",
+      "args": {
+        "location": "Tokyo",
+        "simulate_failure": true
+      },
+      "result": "{\"status\": \"error\", \"code\": 503, \"message\": \"Simulated Tool Failure: Weather service unreachable for 'Tokyo' (503 Service Unavailable).\"}",
+      "reasoning": "Verification Failed: Raw 503 error returned without clear user guidance or graceful handling.",
+      "intermediate_decision": "Encountered 503 error; prompt_v1 stops without error handling guardrails.",
+      "draft": "Error: Tool failed with 503 Service Unavailable."
+    }
+  ],
+  "final_answer": "Error: Tool failed with 503 Service Unavailable.\n\n[Loop Notice: Maximum iteration limit reached. Best verified draft returned.]"
+}

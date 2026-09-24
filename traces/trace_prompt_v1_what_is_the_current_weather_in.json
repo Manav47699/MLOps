@@ -1,0 +1,25 @@
+{
+  "query": "What is the current weather in Tokyo?",
+  "prompt_version": "prompt_v1",
+  "prompt_description": "Baseline naive prompt without entity decomposition or outage handling",
+  "system_prompt": "You are a basic AI assistant. Answer user queries. Use tools if available. Stop after the first answer.",
+  "total_iterations": 1,
+  "completed": true,
+  "termination_reason": "success",
+  "execution_time_seconds": 0.0001,
+  "total_tokens": 80,
+  "steps": [
+    {
+      "step": 1,
+      "tool": "get_weather",
+      "args": {
+        "location": "Tokyo"
+      },
+      "result": "{\"status\": \"ok\", \"location\": \"Tokyo\", \"temperature\": \"18C\", \"condition\": \"Sunny\"}",
+      "reasoning": "Verification Passed: Draft accurately matches tool result.",
+      "intermediate_decision": "Single weather entity 'Tokyo' retrieved successfully.",
+      "draft": "The current weather in Tokyo is 18C with Sunny skies."
+    }
+  ],
+  "final_answer": "The current weather in Tokyo is 18C with Sunny skies."
+}

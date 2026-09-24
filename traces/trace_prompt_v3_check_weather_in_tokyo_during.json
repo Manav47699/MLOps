@@ -1,0 +1,26 @@
+{
+  "query": "Check weather in Tokyo during an upstream service outage.",
+  "prompt_version": "prompt_v3",
+  "prompt_description": "Multi-step decomposition with factual verification and outage error guardrails",
+  "system_prompt": "You are a robust agentic AI assistant. Step 1: Decompose multi-step queries and invoke tools with verified arguments. Step 2: Fact-check answers against tool outputs and ChromaDB knowledge contexts. Step 3: If any tool encounters an error, state the outage clearly without fabricating unverified data. Step 4: Verify constraints before finalizing.",
+  "total_iterations": 1,
+  "completed": true,
+  "termination_reason": "success",
+  "execution_time_seconds": 0.0002,
+  "total_tokens": 126,
+  "steps": [
+    {
+      "step": 1,
+      "tool": "get_weather",
+      "args": {
+        "location": "Tokyo",
+        "simulate_failure": true
+      },
+      "result": "{\"status\": \"error\", \"code\": 503, \"message\": \"Simulated Tool Failure: Weather service unreachable for 'Tokyo' (503 Service Unavailable).\"}",
+      "reasoning": "Verification Passed: Outage handled gracefully with explicit zero-hallucination notice.",
+      "intermediate_decision": "Detected 503 service outage; triggering error guardrail for verified graceful notice.",
+      "draft": "Notice: The weather service is currently unreachable (503 Service Unavailable). Live weather data cannot be retrieved at this time, and no fabricated values are provided."
+    }
+  ],
+  "final_answer": "Notice: The weather service is currently unreachable (503 Service Unavailable). Live weather data cannot be retrieved at this time, and no fabricated values are provided."
+}

@@ -13,4 +13,5 @@ wheels/
 mlruns/
 mlartifacts/
 chroma_db/
+*.db
 .env

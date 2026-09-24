@@ -1,0 +1,25 @@
+{
+  "query": "Compare current weather in Paris and Kathmandu and recommend where to walk.",
+  "prompt_version": "prompt_v1",
+  "prompt_description": "Baseline naive prompt without entity decomposition or outage handling",
+  "system_prompt": "You are a basic AI assistant. Answer user queries. Use tools if available. Stop after the first answer.",
+  "total_iterations": 1,
+  "completed": false,
+  "termination_reason": "max_iterations_hit",
+  "execution_time_seconds": 0.0002,
+  "total_tokens": 84,
+  "steps": [
+    {
+      "step": 1,
+      "tool": "get_weather",
+      "args": {
+        "location": "Paris"
+      },
+      "result": "{\"status\": \"ok\", \"location\": \"Paris\", \"temperature\": \"22C\", \"condition\": \"Cloudy\"}",
+      "reasoning": "Verification Failed: Only Paris data was retrieved. Missing Kathmandu comparison data.",
+      "intermediate_decision": "Retrieved Paris; prompt_v1 terminates early before retrieving Kathmandu.",
+      "draft": "In Paris, the weather is 22C and Cloudy."
+    }
+  ],
+  "final_answer": "In Paris, the weather is 22C and Cloudy.\n\n[Loop Notice: Maximum iteration limit reached. Best verified draft returned.]"
+}
