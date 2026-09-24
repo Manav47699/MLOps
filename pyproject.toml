@@ -1,0 +1,26 @@
+[project]
+name = "week17"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Manav47699", email = "acharyamanav7@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "chromadb>=1.5.9",
+    "evidently>=0.4.30",
+    "fastapi>=0.141.1",
+    "matplotlib>=3.11.2",
+    "mlflow>=2.14.0",
+    "numpy>=2.5.3",
+    "openai>=3.19.2",
+    "pandas>=3.0.6",
+    "pydantic>=2.13.5",
+    "requests>=2.34.2",
+    "scikit-learn>=1.4.0",
+    "streamlit>=1.64.0",
+    "uvicorn>=0.53.0",
+]
+
+

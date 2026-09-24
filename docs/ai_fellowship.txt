@@ -1,0 +1,21 @@
+# AI Fellowship Program Guidelines
+
+Welcome to the AI Fellowship Program!
+
+## About the Fellowship
+The AI Fellowship is an intensive 16-week program designed to train engineers in building real-world AI applications.
+The program covers deep learning fundamentals, transformers, large language models, retrieval augmented generation (RAG), and production engineering.
+
+## Week 15 Overview
+Week 15 focuses on Applied AI and Engineering AI Systems.
+Students learn how to:
+1. Connect to LLMs using APIs like OpenAI and self-hosted vLLM servers.
+2. Build Retrieval-Augmented Generation (RAG) pipelines using ChromaDB.
+3. Implement structured outputs using Pydantic and JSON mode.
+4. Integrate function calling (tool calling) for tasks like weather lookups.
+5. Productionize AI apps using FastAPI, Streamlit, and Docker Compose.
+6. Implement reliability patterns such as retry mechanisms and model fallbacks.
+
+## Project Submission Requirements
+Students must submit their working code, a Dockerfile, a docker-compose.yml configuration, and a README with an architecture diagram.
+All code should be clean, beginner-friendly, and well-commented.

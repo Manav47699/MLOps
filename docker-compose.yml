@@ -1,0 +1,28 @@
+services:
+  # FastAPI Backend Server
+  backend:
+    build: .
+    container_name: fellowship_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-dummy-key}
+      - VLLM_BASE_URL=${VLLM_BASE_URL:-http://localhost:8000/v1}
+      - PRIMARY_MODEL=${PRIMARY_MODEL:-gpt-4o-mini}
+      - FALLBACK_MODEL=${FALLBACK_MODEL:-gpt-3.5-turbo}
+    volumes:
+      - ./chroma_db:/app/chroma_db
+      - ./docs:/app/docs
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  # Streamlit Web UI
+  frontend:
+    build: .
+    container_name: fellowship_frontend
+    ports:
+      - "8501:8501"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+    command: ["streamlit", "run", "ui.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
