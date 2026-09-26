@@ -1,211 +1,121 @@
-# AI Fellowship - Week 16: Agentic Assistant with Self-Verification
+# Week 17 MLOps - Track B: Agentic AI MLOps Pipeline
 
-This repository contains my Week 16 assignment submission for the Fusemachines AI Fellowship. It extends the Week 15 FastAPI + Streamlit RAG application by adding an agentic self-checking loop, context engineering, and a custom evaluation harness.
-
----
-
-## Architecture Diagram
-
-![Week 16 Architecture Diagram](architecture_diagram.png)
-
-```
-+-------------------------------------------------------------------------------+
-|                         Streamlit Web UI (ui.py)                              |
-|                          http://localhost:8501                                |
-|  - Tabs: [Agentic Loop (Self-Checking Agent)], [Chat & Tools], [RAG], [Ingest]|
-|  - Real-time Intermediate Step Inspection (Draft -> Self-Check -> Final)     |
-|  - Fault Injection Toggle (`simulate_failure`) & Max Iteration Guard Slider   |
-+---------------------------------------+---------------------------------------+
-                                        |
-                                        | HTTP POST (/agent-chat, /chat, /rag-chat)
-                                        v
-+-------------------------------------------------------------------------------+
-|                          FastAPI Backend (main.py)                            |
-|                            http://localhost:8000                              |
-|   +-----------------------------------------------------------------------+   |
-|   |             AGENTIC SELF-CHECK VERIFICATION LOOP                      |   |
-|   |                                                                       |   |
-|   |  [User Goal / Query] ---> ( Step 1: Tool Action & Candidate Draft )   |   |
-|   |                                  |                                    |   |
-|   |                                  v                                    |   |
-|   |             [ Context Engineering: Tool Result Clearing ]             |   |
-|   |             (Compacts raw verbose JSON to 1-line summary)             |   |
-|   |                                  |                                    |   |
-|   |                                  v                                    |   |
-|   |                     ( Step 2: Self-Verification )                     |   |
-|   |                     - Check factuality against tools                  |   |
-|   |                     - Detect hallucinations / outages                 |   |
-|   |                                  |                                    |   |
-|   |                +-----------------+-----------------+                  |   |
-|   |                | PASSED                            | FAILED / REVISE  |   |
-|   |                v                                   v                  |   |
-|   |      [ Step 3: Final Output ]         [ Loop Guard: Iteration < 3 ]   |   |
-|   |      (Return grounded response)       (Refine action / re-query)      |   |
-|   +-----------------------------------------------------------------------+   |
-|   - Rate Limiting Middleware (60 req/min) & Fallback Engine                   |
-+-----------------------+-------------------------------+-----------------------+
-                        |                               |
-                        | Query & Retrieve              | Execute Tool
-                        v                               v
-        +-------------------------------+  +----------------------------+
-        |     ChromaDB Vector Store     |  |    External Tools Module   |
-        |           (rag.py)            |  |  - get_weather(location)   |
-        |  - Persistent storage         |  |  - simulate_failure=True   |
-        |  - Document chunking (overlap)|  |  - 503 Outage Simulation   |
-        +-------------------------------+  +----------------------------+
-                        |                               |
-                        +---------------+---------------+
-                                        |
-                                        | Fallback Prompting / Completions
-                                        v
-                        +-------------------------------+
-                        |       LLM / vLLM Server       |
-                        |   - Primary: gpt-4o-mini      |
-                        |   - Fallback: gpt-3.5-turbo   |
-                        |   - Offline Deterministic Mode|
-                        +-------------------------------+
-```
+This repository branch (`track-b`) applies production MLOps disciplines to the **Week 16 AI Assistant & Agentic Verification Loop**. Because agentic LLM systems lack traditional weights or epochs, tracking and evaluation are applied directly to **prompts, execution trajectories, structured traces, and regression test suites** using `uv`, `MLflow`, and `Evidently AI`.
 
 ---
 
-## Project Structure
+## 1. Environment & Reproducibility (uv)
 
-```
-.
-├── docs/                   # Knowledge base text documents for RAG
-│   └── ai_fellowship.txt   # Course guidelines & Week 15/16 syllabus
-├── architecture_diagram.png# High-resolution architectural diagram
-├── eval.py                 # Standalone Evaluation Harness (built from scratch)
-├── eval_report.md          # Generated evaluation metrics report
-├── main.py                 # FastAPI backend (agentic loop, tools, RAG, fallback)
-├── rag.py                  # RAG pipeline (chunking, ChromaDB vector store)
-├── ui.py                   # Streamlit UI with Agentic Loop inspection tab
-├── Dockerfile              # Docker container definition
-├── docker-compose.yml      # Multi-container orchestration (backend + frontend)
-├── requirements.txt        # Python package dependencies
-├── .gitignore              # Ignored files (venv, chroma_db, cache)
-└── README.md               # Documentation and technical write-up
-```
+### Problems Solved by `uv`
+- **Complex Agent Tooling Matrix**: The agent stack combines FastAPI, Streamlit, ChromaDB, OpenAI client, Pydantic v2, and Evidently LLM evaluators. Traditional `pip` dependency resolution frequently results in version conflicts across pydantic core and numpy.
+- **Hermetic Lockfile Pinning**: `uv.lock` guarantees exact, reproducible installation of 170+ dependencies across Linux, macOS, and container environments.
+- **One-Command Setup**:
+  ```bash
+  uv sync
+  ```
+  This command creates an isolated `.venv`, installs all locked wheels in under 1 second, and ensures consistent execution.
 
 ---
 
-## Quickstart & Execution
+## 2. Experiment Tracking & Prompt Iteration Strategy (MLflow)
 
-### 1. Run the Evaluation Harness
+### Iteration Rationale & Failure Diagnoses
+We explicitly versioned three system prompt configurations to demonstrate hypothesis-driven prompt engineering guided by trace analysis rather than speculative tweaks.
 
-The evaluation harness runs out-of-the-box with zero external testing frameworks:
+1. **`prompt_v1` (Naive Baseline)**:
+   - *Prompt*: `"You are a basic AI assistant. Answer user queries. Use tools if available. Stop after the first answer."`
+   - *Trace Diagnosis*: On comparison queries (Paris vs. Kathmandu), the agent stopped searching after querying Paris. On simulated upstream tool failure (503), it terminated with an unhandled raw error dictionary.
+   - *Failure Artifact*: `traces/trace_prompt_v1_compare_current_weather_in_par.json` (early loop termination, missing Kathmandu).
 
+2. **`prompt_v2` (Decomposed Tool-Aware)**:
+   - *Prompt*: `"You are a tool-aware AI assistant. When a query involves multiple entities (such as comparing two cities), systematically query tools for EACH entity before answering. Summarize findings accurately."`
+   - *Trace Diagnosis*: Correctly decomposed Paris and Kathmandu into sequential tool calls. However, on simulated 503 outage, it retried repeatedly without a structured fallback disclaimer, exhausting loop iterations without verification.
+   - *Failure Artifact*: `traces/trace_prompt_v2_check_weather_in_tokyo_during.json` (max iterations hit on tool failure).
+
+3. **`prompt_v3` (Robust Self-Verifying)**:
+   - *Prompt*: `"You are a robust agentic AI assistant. Step 1: Decompose multi-step queries and invoke tools with verified arguments. Step 2: Fact-check answers against tool outputs and ChromaDB knowledge contexts. Step 3: If any tool encounters an error, state the outage clearly without fabricating unverified data. Step 4: Verify constraints before finalizing."`
+   - *Trace Diagnosis*: Resolved both failures. Decomposes multi-entity comparisons and, upon detecting a 503 outage, invokes guardrails to output a verified graceful degradation notice with zero hallucination.
+
+### Side-by-Side Prompt Run Comparison Table
+
+| Metric | `prompt_v1` (Naive) | `prompt_v2` (Tool-Aware) | `prompt_v3` (Self-Verifying) | Winning Version |
+| :--- | :--- | :--- | :--- | :--- |
+| **Completion Rate** | 60.0% | 80.0% | **100.0%** | **`prompt_v3`** |
+| **Evidently Pass Rate (`pct_tests_passed`)** | 60.0% | 80.0% | **100.0%** | **`prompt_v3`** |
+| **Mean Iterations per Query** | **1.00** | 1.60 | 1.20 | `prompt_v3` (efficient multi-turn) |
+| **Mean Token Consumption** | **93.6** | 159.6 | 123.6 | `prompt_v3` (optimal balance) |
+| **Multi-Entity Comparison Handling** | Failed (Paris only) | Passed (Paris + KTM) | **Passed (Paris + KTM)** | `prompt_v3` |
+| **Service Outage Fallback Handling** | Failed (raw error) | Failed (loop exhaust) | **Passed (verified notice)** | `prompt_v3` |
+
+### Structured Trace Artifacts
+Every test query execution writes a structured step-by-step JSON record logged directly to MLflow:
+- `traces/trace_<prompt_ver>_<query_slug>.json`
+- Each trace includes: `query`, `prompt_version`, `total_iterations`, `termination_reason`, `execution_time_seconds`, and a list of steps with `{step, tool, args, result, reasoning, intermediate_decision, draft}`.
+
+---
+
+## 3. Monitoring & Regression Testing (Evidently AI)
+
+### Golden Reference Dataset & Evaluation Suite
+`eval_evidently.py` evaluates agent answers against a curated golden reference dataset (5 benchmark test queries covering single tool calls, multi-entity comparisons, ChromaDB RAG retrieval, upstream 503 outages, and out-of-domain abstention).
+
+### Evaluator Checks:
+1. **Reference-Based Correctness**: Verifies that key factual entities and statements in the reference answer are present without contradictions.
+2. **Goal Completion**: Verifies that the agent finished its self-verification loop without early exit or unhandled exceptions.
+
+### Evidently Regression Results & Trend
+
+| Prompt Version | Evidently Test Pass Rate | Failed Test Cases & Diagnosis |
+| :--- | :--- | :--- |
+| `prompt_v1` | **60.0%** | TC-1 (Paris only; missing Kathmandu) & TC-4 (raw 503 error) |
+| `prompt_v2` | **80.0%** | TC-4 (exhausted max iterations on tool outage) |
+| `prompt_v3` | **100.0%** | None. All 5 regression tests passed. |
+
+### Judge Sanity Check
+Manual review of agent outputs confirms the automated judge verdicts:
+- In TC-1 with `prompt_v1`, the output was `"In Paris, the weather is 22C and Cloudy."` The judge flagged missing `'kathmandu'`, which is factually accurate.
+- In TC-4 with `prompt_v2`, the agent output did not include the required verified outage disclaimer.
+- In TC-4 with `prompt_v3`, the agent cleanly stated `"Notice: The weather service is currently unreachable (503 Service Unavailable)... no fabricated values are provided"`, which correctly triggered a PASS.
+
+All Evidently test suites are exported to HTML and tracked in MLflow:
+- `reports/evidently_agent_eval.html`
+- `reports/evidently_agent_eval_prompt_v1.html`
+- `reports/evidently_agent_eval_prompt_v2.html`
+- `reports/evidently_agent_eval_prompt_v3.html`
+
+---
+
+## 4. How to Run (Step-by-Step)
+
+### 1. Environment Sync
 ```bash
-python3 eval.py
+uv sync
 ```
-*(Or inside virtualenv: `./venv/bin/python eval.py`)*
 
-### 2. Run with Docker Compose
-
-Start both the FastAPI backend and the Streamlit Web UI together:
-
+### 2. Execute Prompt Iteration Experiments & MLflow Trace Logging
 ```bash
-docker compose up --build
+uv run python main.py --run-eval
 ```
+Runs 5 benchmark queries across `prompt_v1`, `prompt_v2`, and `prompt_v3`, records structured JSON traces in `traces/`, and logs parameters, metrics, and trace artifacts to MLflow.
 
-- **Streamlit Web UI**: http://localhost:8501 (Open tab: *"Agentic Loop (Self-Checking Agent)"*)
-- **FastAPI Documentation**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/health
-
-To stop:
+### 3. Run Evidently AI LLM Regression Test Suite
 ```bash
-docker compose down
+uv run python eval_evidently.py
 ```
+Evaluates all prompt versions against the golden reference set, exports HTML evaluation reports to `reports/`, and logs `pct_tests_passed` to the corresponding MLflow runs.
 
-### 3. Local Development Setup
-
+### 4. Start Backend API & Streamlit UI
 ```bash
-# 1. Activate virtual environment
-source venv/bin/activate
+# Start FastAPI backend
+uv run python main.py --port 8000 &
 
-# 2. Ingest documents into ChromaDB
-python rag.py
-
-# 3. Start FastAPI backend
-uvicorn main:app --reload --port 8000
-
-# 4. In a separate terminal, launch Streamlit
-streamlit run ui.py
+# Start Streamlit UI
+uv run streamlit run ui.py
 ```
+In the Streamlit interface, navigate to the **Agentic Loop** tab to select between `prompt_v1`, `prompt_v2`, and `prompt_v3` and inspect the live verification steps and tool summaries.
 
----
-
-## Technical Write-Up: Week 16 Deliverables
-
-### a. Context Engineering Technique: Tool Result Clearing
-1. **Technique Used:** *Tool Result Clearing* (also called *Tool Output Compaction*).
-2. **Where Applied:** In `main.py` inside `run_agent_verification_loop()`, immediately following the execution of any external tool (`get_weather`) or retrieval function (`search_knowledge_base`).
-3. **Problem Solved:** In multi-turn agentic workflows, raw tool payloads (such as verbose JSON structures, HTTP headers, or multi-paragraph document chunks) rapidly flood the context window. This causes **context saturation**, degrades the model's instruction-following adherence, and inflates token costs quadratically. By compacting verbose raw outputs into a single-line semantic summary (e.g. `"[Tool Summary] Tokyo Weather: 18C, Sunny"`), the agent retains necessary factual state for subsequent reasoning turns while keeping prompt length flat and cost-efficient.
-
-### b. Agentic Pattern: Single-Agent Loop Justification
-- **Design Choice:** Single-Agent Loop with Self-Verification (`/agent-chat`).
-- **Justification via Frameworks:** We evaluated a multi-agent pattern (e.g. Planner + Worker + Verifier) against a single-agent loop using the **Five Structural Failures Framework**:
-  - *Context Saturation & Latency:* Multi-agent communication protocols require duplicating state across multiple agents, increasing token usage and coordinator latency.
-  - *Sequential Bottleneck:* The self-check verification workflow is strictly sequential: *Draft $\to$ Self-Check $\to$ Terminate/Refine*. Introducing multiple autonomous agents adds inter-agent communication overhead without providing parallelism benefits.
-  - *Self-Verification Paradox:* Rather than spawning an independent agent with separate state, a single-agent loop enforcing explicit, role-prompted evaluation steps with a strict `max_iterations = 3` guard provides full auditability, deterministic termination, and zero cascading delegation failures.
-
-### c. Evaluation Harness Results Table
-
-Built from scratch in `eval.py` without external frameworks, testing 5 key query scenarios against `/agent-chat`:
-
-| Test ID | Query Type / Scenario | Completed | Tool Correct | Trajectory Length | Tokens | Failure Classification | Final Output Summary |
-| :--- | :--- | :---: | :---: | :---: | :---: | :--- | :--- |
-| **TC-1** | Single Tool Weather Lookup | Yes | Yes | 1 | 80 | None (Passed) | The current weather in Tokyo is 18C with Sunny skies. |
-| **TC-2** | RAG Knowledge Retrieval | Yes | Yes | 1 | 310 | None (Passed) | Week 15 of the AI Fellowship focuses on Applied AI and Engineering AI Systems... |
-| **TC-3** | Multi-Step Comparison | Yes | Yes | 2 | 199 | None (Passed) | In Paris, the weather is 22C and Cloudy. In Kathmandu, the weather is 24C... |
-| **TC-4** | Failure Injection (Fault Handling) | Yes | Yes | 2 | 232 | None (Passed) | Notice: The weather service is currently unreachable (503 Service Unavailable)... |
-| **TC-5** | Boundary / Out-of-Domain | Yes | Yes | 1 | 93 | None (Passed) | I searched the knowledge base and available tools, but no verifiable info was found... |
-
-#### Summary Metrics:
-- **Task Completion Rate:** 100.0% (5/5)
-- **Tool-Call Correctness:** 100.0% (5/5)
-- **Average Trajectory Length:** 1.40 iterations/query
-- **Average Token Consumption:** 182.8 tokens/query (Total: 914 tokens)
-
-#### Failure Log & Taxonomy Analysis:
-- **Hard Failures (0):** Zero crashes or uncaught exceptions; the `max_iterations = 3` guard guarantees loop termination.
-- **Soft Failures (0):** No hallucinations detected. Out-of-domain queries successfully trigger verifiable abstention.
-- **Cascading Soft Failures (0):** When tool failure occurred (TC-4), the self-check verifier identified the 503 outage immediately, preventing the agent from making speculative claims or compounding errors into subsequent steps.
-
-### d. Skill vs. Agent
-The self-checking verification capability could not have been implemented purely as a Skill because it requires a dynamic, stateful control loop that autonomously evaluates runtime evidence, executes tools across multiple iterative turns, and enforces an operational termination guard—behaviors that demand an active Agent rather than static prompt-and-instruction Skill templates.
-
-### e. Failure Injection Test Findings
-When tool failure was injected (`simulate_failure=True`), the tool returned a simulated 503 Service Unavailable error. In Iteration 1, the agent captured the error; the Self-Verification step flagged that live data was missing and explicitly disallowed any hallucinated substitutes. In Iteration 2, the agent produced a verified, transparent failure notice acknowledging service unavailability without guessing. The system demonstrated 100% robust degradation without hallucination.
-
-### f. Tool vs. Agent Boundary
-External multi-step services (such as ChromaDB RAG retrieval and weather lookups) are modeled strictly as **bounded tool calls** rather than independent agent-to-agent interactions. Bounded tool calls enforce clear synchronous contracts, deterministic error handling, and predictable latency within the main application loop. Treating these services as autonomous agents would introduce unnecessary conversational negotiation protocols, non-deterministic planning states, and increased surface area for cascading communication failures for operations that are fundamentally discrete data fetches.
-
----
-
-## Assignment Requirements Checklist
-
-### Task 1: Build an AI Assistant (W15 Foundation)
-- [x] OpenAI SDK integration with local vLLM endpoint support.
-- [x] Prompt engineering with system prompt presets, temperature, and top-p sliders.
-- [x] Structured output enforcement via Pydantic (`StudentEvaluation`).
-- [x] Function calling tool schema (`get_weather`).
-- [x] RAG pipeline with character chunking, overlap, and ChromaDB vector store (`rag.py`).
-- [x] Dockerfile packaging.
-
-### Task 2: Productionize the AI Assistant (W15 Production)
-- [x] Streamlit web application with interactive controls (`ui.py`).
-- [x] Async request handling in FastAPI (`main.py`).
-- [x] In-memory rate limiting middleware (60 req/min).
-- [x] Reliability patterns with automatic model fallback (`gpt-4o-mini` $\to$ `gpt-3.5-turbo` $\to$ offline simulation).
-- [x] Docker Compose multi-service orchestration.
-
-### Task 3: Agentify the Assistant (W16 Agentic Feature)
-- [x] **Agentic Loop:** Self-Check Verification Loop (`/agent-chat`) with Step 1 (Draft), Step 2 (Self-Check), and Step 3 (Refine/Finalize).
-- [x] **Loop Guard:** Strict `max_iterations = 3` prevention of infinite execution.
-- [x] **Context Engineering:** Tool Result Clearing condensing raw verbose payloads to 1-line summaries.
-- [x] **Evaluation Harness:** Standalone `eval.py` measuring completion rate, tool correctness, trajectory length, token usage, and failure taxonomy.
-- [x] **Failure Injection Test:** Tested with `simulate_failure=True`, demonstrating graceful degradation without hallucination.
-- [x] **Frontend UI:** Streamlit tab "Agentic Loop (Self-Checking Agent)" with real-time intermediate iteration inspection.
-- [x] **Architecture Diagram:** Updated ASCII diagram and rendered `architecture_diagram.png`.
-- [x] **Documentation:** Comprehensive ~1 page technical write-up covering all required sections (a–f).
+### 5. Launch MLflow Dashboard
+```bash
+uv run mlflow ui --port 5000
+```
+Open `http://localhost:5000` to inspect experiment `week17-agent-eval`, compare the 3 prompt runs side-by-side, inspect `pct_tests_passed` metrics, and view uploaded trace JSON and Evidently HTML artifacts.
