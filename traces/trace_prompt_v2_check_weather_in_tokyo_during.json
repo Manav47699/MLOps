@@ -6,7 +6,7 @@
   "total_iterations": 3,
   "completed": false,
   "termination_reason": "max_iterations_hit",
-  "execution_time_seconds": 0.0003,
+  "execution_time_seconds": 0.0002,
   "total_tokens": 306,
   "steps": [
     {
